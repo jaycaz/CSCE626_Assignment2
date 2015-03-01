@@ -26,3 +26,8 @@
 *.exe
 *.out
 *.app
+
+# Custom files
+psum_mpi
+psum_mpi2
+psum_openmp
