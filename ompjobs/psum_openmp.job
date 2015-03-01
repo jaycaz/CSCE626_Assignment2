@@ -6,8 +6,14 @@ module load openmpi
 cp $PBS_O_WORKDIR/psum_openmp .
 
 # Run program
-./psum_openmp 4 100000000
-./psum_openmp 6 100000000
-./psum_openmp 12 100000000
+./psum_openmp 1 1000000
+./psum_openmp 4 1000000
+./psum_openmp 6 1000000
+./psum_openmp 12 1000000
+
+./psum_openmp 1 1000000000
+./psum_openmp 4 1000000000
+./psum_openmp 6 1000000000
+./psum_openmp 12 1000000000
 
 # Post Processing

@@ -19,6 +19,8 @@
 
 #include <cmath>
 
+//#include "papi.h"
+
 using namespace std;
 
 /*==============================================================
@@ -28,8 +30,8 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
 {
   struct timeval elapsed;
   // calculate elapsed time
-  if(start->tv_usec > end->tv_usec) {
 
+  if(start->tv_usec > end->tv_usec) {
     end->tv_usec += 1000000;
     end->tv_sec--;
   }
@@ -46,16 +48,18 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
 void up_sweep(vector<long> &nums)
 {
   int n = nums.size();
-  int nceil = pow(2, ceil(log2(n)));
+  int nceil = (int) pow(2, ceil(log2(n)));
   int h = (int) log2(nceil);
 
   for(int i = 1; i <= h; i++)
   {
-    int step = pow(2, i);
+    int step = (int) pow(2.0, i);
 
-    #pragma omp parallel for
+    #pragma omp parallel for 
       for(int j = step-1; j < n; j += step)
       {
+        //printf("Up-sweep %d: Thread %d working on value %d\n", i, omp_get_thread_num(), j);
+        //fflush(stdout);
         nums[j] += nums[j - step/2];
       }
   }
@@ -67,16 +71,18 @@ void up_sweep(vector<long> &nums)
 void down_sweep(vector<long> &nums)
 {
   int n = nums.size();
-  int nceil = pow(2, ceil(log2(n)));
+  int nceil = (int) pow(2, ceil(log2(n)));
   int h = (int) log2(nceil);
 
   for(int i = h-1; i > 0; i--)
   {
-    int step = pow(2, i);
+    int step = (int) pow(2.0, i);
 
     #pragma omp parallel for
       for(int j = step-1; j < n - step/2; j += step)
       {
+        //printf("Down-sweep %d: Thread %d working on value %d\n", i, omp_get_thread_num(), j);
+        //fflush(stdout);
         nums[j + step/2] += nums[j];
       }
   }
@@ -145,17 +151,32 @@ int main(int argc, char *argv[]) {
             argv[0], omp_get_max_threads(), numints);
 
   // Allocate shared memory for original data and new prefix sums
+  printf("Allocating %ld bytes of input memory...", numints * sizeof(int) * 2);
+  fflush(stdout);
   data.resize(numints);
   prefix_sums.resize(numints);
+  printf("done.\n");
 
   // Generate random ints in parallel
-  #pragma omp parallel for
+  printf("Generating input data...");
+  fflush(stdout);
+  //#pragma omp parallel
+  {
+    srand(omp_get_thread_num() * int(time(NULL)));
+
+    //#pragma omp for
     for(int i = 0; i < data.size(); i++)
     {
       int num = rand();
       data[i] = num;
-      prefix_sums[i] = num;
+      prefix_sums[i] = data[i];
     }
+  }
+
+  printf("done.\n");
+
+  printf("Calculating prefix sum...");
+  fflush(stdout);
 
   // Begin timing
   gettimeofday(&start, &tzp);
@@ -166,8 +187,11 @@ int main(int argc, char *argv[]) {
   // End timing
   gettimeofday(&end,&tzp);
 
+  printf("done.\n");
+
   // Display checksum results
-  printf("Checking correctness...\n");
+  printf("Checking correctness...");
+  fflush(stdout);
   if(check_sums(data, prefix_sums))
   {
     printf("Correctness confirmed!\n");
@@ -176,9 +200,10 @@ int main(int argc, char *argv[]) {
   {
     printf("Algorithm is not correct.\n");
   }
+  printf("done.\n");
 
   // Display timing results
-  print_elapsed("Summation", &start, &end);
+  print_elapsed("Prefix Sum", &start, &end);
 
   return 0;
 }

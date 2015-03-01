@@ -9,18 +9,18 @@
 
 using namespace std;
 
-int main()
+int main(int argc, char **argv)
 {
     // Set number of threads
     omp_set_num_threads(NUM_THREADS);
 
     vector<int> data;
+    int num = atoi(argv[1]);
 
     #pragma omp parallel for
-    for(vector<int>::iterator it = data.begin(); it != data.end(); it++)
+    for(int i = 0; i < num; i++)
     {
-        printf("Thread %d filling num %d\n", omp_get_thread_num(), it);
-        *it = rand();
+        printf("Thread %d claiming number %d\n", omp_get_thread_num(), i);
     }
 
     return 0;
