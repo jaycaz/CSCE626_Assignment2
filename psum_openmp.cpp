@@ -48,13 +48,14 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end,
 void up_sweep(vector<long> &nums)
 {
   int n = nums.size();
-  int h = (int) log2(n);
+  int nceil = pow(2, ceil(log2(n)));
+  int h = (int) log2(nceil);
 
   for(int i = 1; i <= h; i++)
   {
-    int step = pow(2,i);
+    int step = pow(2, i);
 
-    for(int j = n-1; j >= 0; j -= step)
+    for(int j = step-1; j < n; j += step)
     {
       nums[j] += nums[j - step/2];
     }
@@ -64,12 +65,14 @@ void up_sweep(vector<long> &nums)
 void down_sweep(vector<long> &nums)
 {
   int n = nums.size();
-  int h = (int) log2(n);
+  int nceil = pow(2, ceil(log2(n)));
+  int h = (int) log2(nceil);
 
   for(int i = h-1; i > 0; i--)
   {
     int step = pow(2, i);
-    for(int j = step-1; j < n-2; j += step)
+
+    for(int j = step-1; j < n - step/2; j += step)
     {
       nums[j + step/2] += nums[j];
     }
@@ -140,7 +143,6 @@ int main(int argc, char *argv[]) {
    *****************************************************/
 
   #pragma omp parallel for
-
     for(int i = 0; i < data.size(); i++)
     {
       int num = i+1;
@@ -148,9 +150,9 @@ int main(int argc, char *argv[]) {
       prefix_sums[i] = num;
     }
 
-  printf("Data:\n");
-  for(int i = 0; i < data.size(); i++) printf("%ld, ", data[i]);
-  printf("\n");
+  //printf("Data:\n");
+  //for(int i = 0; i < data.size(); i++) printf("%ld, ", data[i]);
+  //printf("\n");
 
 
   /*****************************************************
@@ -162,12 +164,13 @@ int main(int argc, char *argv[]) {
 
   prefix_sum(prefix_sums);
 
+  // End timing
   gettimeofday(&end,&tzp);
 
   // Display results
-  printf("Prefix sums:\n");
-  for(int i = 0; i < data.size(); i++) printf("%ld, ", prefix_sums[i]);
-  printf("\n");
+  //printf("Prefix sums:\n");
+  //for(int i = 0; i < data.size(); i++) printf("%ld, ", prefix_sums[i]);
+  //printf("\n");
 
   printf("Checking correctness...\n");
   if(check_sums(data, prefix_sums))
