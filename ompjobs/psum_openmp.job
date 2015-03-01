@@ -1,0 +1,13 @@
+#PBS -l nodes=1:ppn=12,mem=20gb,walltime=00:15:00
+
+#
+# Job Pre Processing
+module load openmpi
+cp $PBS_O_WORKDIR/psum_openmp .
+
+# Run program
+./psum_openmp 4 100000000
+./psum_openmp 6 100000000
+./psum_openmp 12 100000000
+
+# Post Processing
