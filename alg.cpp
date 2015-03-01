@@ -55,11 +55,10 @@ void up_sweep(vector<long> &nums)
   {
     int step = pow(2, i);
 
-    #pragma omp parallel for
-      for(int j = step-1; j < n; j += step)
-      {
-        nums[j] += nums[j - step/2];
-      }
+    for(int j = step-1; j < n; j += step)
+    {
+      nums[j] += nums[j - step/2];
+    }
   }
 }
 
@@ -73,11 +72,10 @@ void down_sweep(vector<long> &nums)
   {
     int step = pow(2, i);
 
-    #pragma omp parallel for
-      for(int j = step-1; j < n - step/2; j += step)
-      {
-        nums[j + step/2] += nums[j];
-      }
+    for(int j = step-1; j < n - step/2; j += step)
+    {
+      nums[j + step/2] += nums[j];
+    }
   }
   
 }
