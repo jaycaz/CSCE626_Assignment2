@@ -41,30 +41,9 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end,
   elapsed.tv_usec = end->tv_usec - start->tv_usec;
   elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-  printf("\n %s total elapsed time = %ld (usec)",
+  printf("\n %s total elapsed time = %ld (usec)\n",
     desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec) / niters);
 }
-
-// Functor to sum the numbers
-template<typename T>
-struct sum_functor {
-
-  // Constructor
-  sum_functor() : m_sum(0) {
-  }
-
-  void operator() (int& num) {
-    m_sum +=num;
-  }
-
-  T get_sum() const {
-    return m_sum;
-  }
-
-  protected:
-
-  T m_sum;
-};
 
 void up_sweep(vector<long> &nums)
 {
@@ -181,46 +160,11 @@ int main(int argc, char *argv[]) {
   // Begin timing
   gettimeofday(&start, &tzp);
 
-  //prefix_sum(data, results);
   prefix_sum(prefix_sums);
-
-  /*
-  for(int iteration=0; iteration < numiterations; ++iteration) {
-
-    #pragma omp parallel shared(numints,data,partial_sums,total_sum)
-    {
-      int tid;
-
-      // get the current thread ID in the parallel region
-      tid = omp_get_thread_num();
-
-      // Compute the local partial sum
-      long partial_sum = 0;
-
-      vector<int>::iterator it_cur = data.begin();
-      std::advance(it_cur, tid * numints);
-
-      vector<int>::iterator it_end = it_cur;
-      std::advance(it_end, numints);
-
-      sum_functor<long> result = std::for_each(it_cur, it_end, sum_functor<long>());
-
-      // Write the partial result to share memory
-      partial_sums[tid] = result.get_sum();
-    }
-
-    // Compute the sum of the partial sums
-    total_sum = 0;
-    int max_threads = omp_get_max_threads();
-    for(int i = 0; i < max_threads ; ++i) {
-
-      total_sum += partial_sums[i];
-    }
-  }
-  */
 
   gettimeofday(&end,&tzp);
 
+  // Display results
   printf("Prefix sums:\n");
   for(int i = 0; i < data.size(); i++) printf("%ld, ", prefix_sums[i]);
   printf("\n");
@@ -240,7 +184,6 @@ int main(int argc, char *argv[]) {
    *****************************************************/
 
   print_elapsed("Summation", &start, &end, numiterations);
-  //printf("\n Total sum = %6ld\n", total_sum);
 
   return 0;
 }
