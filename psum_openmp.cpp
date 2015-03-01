@@ -66,9 +66,9 @@ struct sum_functor {
   T m_sum;
 };
 
-void up_sweep(vector<long> &data)
+void up_sweep(vector<long> &nums)
 {
-  int n = data.size();
+  int n = nums.size();
   int h = (int) log2(n);
 
   for(int i = 1; i <= h; i++)
@@ -77,14 +77,14 @@ void up_sweep(vector<long> &data)
 
     for(int j = n-1; j >= 0; j -= step)
     {
-      data[j] += data[j - step/2];
+      nums[j] += nums[j - step/2];
     }
   }
 }
 
-void down_sweep(vector<long> &data)
+void down_sweep(vector<long> &nums)
 {
-  int n = data.size();
+  int n = nums.size();
   int h = (int) log2(n);
 
   for(int i = h-1; i > 0; i--)
@@ -92,18 +92,34 @@ void down_sweep(vector<long> &data)
     int step = pow(2, i);
     for(int j = step-1; j < n-2; j += step)
     {
-      data[j + step/2] += data[j];
+      nums[j + step/2] += nums[j];
     }
   }
   
 }
 
-void prefix_sum(vector<long> &data)
+void prefix_sum(vector<long> &nums)
 {
-  //up_sweep(data, results);
-  //down_sweep(data, results);
-  up_sweep(data);
-  down_sweep(data);
+  up_sweep(nums);
+  down_sweep(nums);
+}
+
+bool check_sums(const vector<long> &data, const vector<long> &prefix_sums)
+{
+  long sum = 0;
+
+  for(int i = 0; i < data.size(); i++)
+  {
+    sum += data[i];
+    if(prefix_sums[i] != sum)    
+    {
+      printf("Algorithm incorrect at index %d:\n", i);
+      printf("\tExpected: %d; Actual: %d\n", sum, data[i]);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /*==============================================================
@@ -134,11 +150,11 @@ int main(int argc, char *argv[]) {
   printf("\nExecuting %s: nthreads=%d, numints=%d, numiterations=%d\n",
             argv[0], omp_get_max_threads(), numints, numiterations);
 
-  /* Allocate shared memory, enough for each thread to have numints*/
+  // Allocate shared memory, enough for each thread to have numints
   data.resize(numints);
 
-  /* Allocate shared memory for partial_sums */
-  //partial_sums.resize(numints);
+  // Allocate shared memory for prefix_sums
+  prefix_sums.resize(numints);
 
   /*****************************************************
    * Generate the random ints in parallel              *
@@ -148,8 +164,9 @@ int main(int argc, char *argv[]) {
 
     for(int i = 0; i < data.size(); i++)
     {
-      //data[i] = rand();
-      data[i] = i+1;
+      int num = i+1;
+      data[i] = num;
+      prefix_sums[i] = num;
     }
 
   printf("Data:\n");
@@ -165,7 +182,7 @@ int main(int argc, char *argv[]) {
   gettimeofday(&start, &tzp);
 
   //prefix_sum(data, results);
-  prefix_sum(data);
+  prefix_sum(prefix_sums);
 
   /*
   for(int iteration=0; iteration < numiterations; ++iteration) {
@@ -205,13 +222,24 @@ int main(int argc, char *argv[]) {
   gettimeofday(&end,&tzp);
 
   printf("Prefix sums:\n");
-  for(int i = 0; i < data.size(); i++) printf("%ld, ", data[i]);
+  for(int i = 0; i < data.size(); i++) printf("%ld, ", prefix_sums[i]);
   printf("\n");
+
+  printf("Checking correctness...\n");
+  if(check_sums(data, prefix_sums))
+  {
+    printf("Correctness confirmed!\n");
+  }
+  else
+  {
+    printf("Algorithm is not correct.\n");
+  }
+
   /*****************************************************
    * Output timing results                             *
    *****************************************************/
 
-  //print_elapsed("Summation", &start, &end, numiterations);
+  print_elapsed("Summation", &start, &end, numiterations);
   //printf("\n Total sum = %6ld\n", total_sum);
 
   return 0;
