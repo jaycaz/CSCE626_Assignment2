@@ -10,7 +10,14 @@ DFLAGS =         # common defines
 
 default:all
 
-all: psum_openmp psum_mpi psum_mpi2
+all: psum_seq psum_openmp psum_mpi psum_mpi2 
+
+#
+# One-thread version of prefix sum program
+#
+
+psum_seq:psum_seq.cpp
+	$(CC) $(CFLAGS) $(DFLAGS) -fopenmp  -o $@ $@.cpp
 
 #
 # OpenMP prefix sum program
@@ -33,4 +40,4 @@ psum_mpi2:psum_mpi2.cpp
 # clean up
 #
 clean:
-	rm psum_openmp psum_mpi psum_mpi2 > /dev/null 2>&1
+	rm psum_seq psum_openmp psum_mpi psum_mpi2 > /dev/null 2>&1

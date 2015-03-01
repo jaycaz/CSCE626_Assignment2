@@ -1,10 +1,5 @@
-/*
- *  sum_openmp.cpp - Demonstrates parallelism via random fill and sum routines
- *                   This program uses OpenMP.
- */
-
 /*---------------------------------------------------------
- *  Parallel Prefix Summation
+ *  Parallel Prefix Summation (using OpenMP)
  *
  *  1. An array of $numints random integers is created, initialized with random values
  *  2. The up-sweep is performed, splitting tasks among threads as evenly as possible

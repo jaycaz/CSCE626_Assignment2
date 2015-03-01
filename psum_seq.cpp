@@ -1,24 +1,12 @@
-/*
- *  sum_openmp.cpp - Demonstrates parallelism via random fill and sum routines
- *                   This program uses OpenMP.
- */
-
 /*---------------------------------------------------------
- *  Parallel Prefix Summation
- *
- *  1. An array of $numints random integers is created, initialized with random values
- *  2. The up-sweep is performed, splitting tasks among threads as evenly as possible
- *  3. The down-sweep is performed, splitting tasks among threads as evenly as possible
- *
+ *  Sequential Prefix Summation
  *---------------------------------------------------------*/
-
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <sys/resource.h>
 #include <sys/time.h>
-#include <omp.h>
 #include <vector>
 #include <algorithm>
 
@@ -29,10 +17,10 @@ using namespace std;
 /*==============================================================
  * print_elapsed (prints timing statistics)
  *==============================================================*/
-void print_elapsed(const char* desc, struct timeval* start, struct timeval* end, int niters) {
-
+void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
+{
   struct timeval elapsed;
-  /* calculate elapsed time */
+  // calculate elapsed time
   if(start->tv_usec > end->tv_usec) {
 
     end->tv_usec += 1000000;
@@ -42,9 +30,12 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end,
   elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
   printf("\n %s total elapsed time = %ld (usec)\n",
-    desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec) / niters);
+    desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
 }
 
+/*==============================================================
+ * up_sweep (performs up-sweep step of prefix sum alg.)
+ *==============================================================*/
 void up_sweep(vector<long> &nums)
 {
   int n = nums.size();
@@ -62,6 +53,9 @@ void up_sweep(vector<long> &nums)
   }
 }
 
+/*==============================================================
+ * down_sweep (performs down-sweep step of prefix sum alg.)
+ *==============================================================*/
 void down_sweep(vector<long> &nums)
 {
   int n = nums.size();
@@ -80,12 +74,18 @@ void down_sweep(vector<long> &nums)
   
 }
 
+/*==============================================================
+ * prefix_sum (combines up-sweep and down-sweep steps)
+ *==============================================================*/
 void prefix_sum(vector<long> &nums)
 {
   up_sweep(nums);
   down_sweep(nums);
 }
 
+/*==============================================================
+ * check_sums (Verifies prefix sum algorithm works with data)
+ *==============================================================*/
 bool check_sums(const vector<long> &data, const vector<long> &prefix_sums)
 {
   long sum = 0;
@@ -105,73 +105,56 @@ bool check_sums(const vector<long> &data, const vector<long> &prefix_sums)
 }
 
 /*==============================================================
- *  Main Program (Parallel Summation)
+ *  Main Program (Parallel Prefix Summation)
  *==============================================================*/
 int main(int argc, char *argv[]) {
 
   // Initialize values
 
   int numints = 0;
-  int numiterations = 0;
+  int numthreads = 1;
 
   vector<long> data;
   vector<long> prefix_sums;
-  //vector<long> results;
 
-  struct timeval start, end;   /* gettimeofday stuff */
+  struct timeval start, end;   // gettimeofday stuff
   struct timezone tzp;
 
+  // Command line arguments
+
   if( argc < 3) {
-    printf("Usage: %s [numints] [numiterations]\n\n", argv[0]);
+    printf("Usage: %s [nthreads] [numints] \n\n", argv[0]);
     exit(1);
   }
 
-  numints       = atoi(argv[1]);
-  numiterations = atoi(argv[2]);
+  numthreads = atoi(argv[1]);
+  numints = atoi(argv[2]);
 
-  printf("\nExecuting %s: nthreads=%d, numints=%d, numiterations=%d\n",
-            argv[0], omp_get_max_threads(), numints, numiterations);
+  printf("\nExecuting %s: nthreads=%d, numints=%d\n",
+            argv[0], 1, numints);
 
-  // Allocate shared memory, enough for each thread to have numints
+  // Allocate shared memory for original data and new prefix sums
   data.resize(numints);
-
-  // Allocate shared memory for prefix_sums
   prefix_sums.resize(numints);
 
-  /*****************************************************
-   * Generate the random ints in parallel              *
-   *****************************************************/
+  // Generate random ints in parallel
+  for(int i = 0; i < data.size(); i++)
+  {
+    int num = rand();
+    data[i] = num;
+    prefix_sums[i] = num;
+  }
 
-  #pragma omp parallel for
-    for(int i = 0; i < data.size(); i++)
-    {
-      int num = i+1;
-      data[i] = num;
-      prefix_sums[i] = num;
-    }
-
-  //printf("Data:\n");
-  //for(int i = 0; i < data.size(); i++) printf("%ld, ", data[i]);
-  //printf("\n");
-
-
-  /*****************************************************
-   * Generate the sum of the ints in parallel          *
-   * NOTE: Repeated for numiterations                  *
-   *****************************************************/
   // Begin timing
   gettimeofday(&start, &tzp);
 
+  // Calculate prefix sums for generated data
   prefix_sum(prefix_sums);
 
   // End timing
   gettimeofday(&end,&tzp);
 
-  // Display results
-  //printf("Prefix sums:\n");
-  //for(int i = 0; i < data.size(); i++) printf("%ld, ", prefix_sums[i]);
-  //printf("\n");
-
+  // Display checksum results
   printf("Checking correctness...\n");
   if(check_sums(data, prefix_sums))
   {
@@ -182,11 +165,8 @@ int main(int argc, char *argv[]) {
     printf("Algorithm is not correct.\n");
   }
 
-  /*****************************************************
-   * Output timing results                             *
-   *****************************************************/
-
-  print_elapsed("Summation", &start, &end, numiterations);
+  // Display timing results
+  print_elapsed("Summation", &start, &end);
 
   return 0;
 }

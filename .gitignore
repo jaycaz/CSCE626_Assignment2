@@ -28,6 +28,7 @@
 *.app
 
 # Custom files
+psum_seq
+psum_openmp
 psum_mpi
 psum_mpi2
-psum_openmp
