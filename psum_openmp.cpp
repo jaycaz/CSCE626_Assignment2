@@ -157,11 +157,10 @@ int main(int argc, char *argv[]) {
   #pragma omp parallel for
     for(int i = 0; i < data.size(); i++)
     {
-      int num = i+1;
+      int num = rand();
       data[i] = num;
       prefix_sums[i] = num;
     }
-
 
   // Begin timing
   gettimeofday(&start, &tzp);
