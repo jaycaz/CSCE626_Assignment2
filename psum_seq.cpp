@@ -39,12 +39,12 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
 void up_sweep(vector<long> &nums)
 {
   int n = nums.size();
-  int nceil = pow(2, ceil(log2(n)));
+  int nceil = (int) pow(2, ceil(log2(n))); 
   int h = (int) log2(nceil);
 
   for(int i = 1; i <= h; i++)
   {
-    int step = pow(2, i);
+    int step = (int) pow(2.0, i); 
 
     for(int j = step-1; j < n; j += step)
     {
@@ -59,12 +59,12 @@ void up_sweep(vector<long> &nums)
 void down_sweep(vector<long> &nums)
 {
   int n = nums.size();
-  int nceil = pow(2, ceil(log2(n)));
+  int nceil = (int) pow(2, ceil(log2(n)));
   int h = (int) log2(nceil);
 
   for(int i = h-1; i > 0; i--)
   {
-    int step = pow(2, i);
+    int step = (int) pow(2.0, i); 
 
     for(int j = step-1; j < n - step/2; j += step)
     {
@@ -134,16 +134,25 @@ int main(int argc, char *argv[]) {
             argv[0], 1, numints);
 
   // Allocate shared memory for original data and new prefix sums
+  printf("Allocating %ld bytes of input memory...", numints * sizeof(int) * 2);
+  fflush(stdout);
   data.resize(numints);
   prefix_sums.resize(numints);
+  printf("done.\n");
 
   // Generate random ints in parallel
+  printf("Generating input data...");
+  fflush(stdout);
   for(int i = 0; i < data.size(); i++)
   {
     int num = rand();
     data[i] = num;
     prefix_sums[i] = num;
   }
+  printf("done.\n");
+
+  printf("Calculating prefix sum...");
+  fflush(stdout);
 
   // Begin timing
   gettimeofday(&start, &tzp);
@@ -154,8 +163,11 @@ int main(int argc, char *argv[]) {
   // End timing
   gettimeofday(&end,&tzp);
 
+  printf("done.\n");
+
   // Display checksum results
-  printf("Checking correctness...\n");
+  printf("Checking correctness...");
+  fflush(stdout);
   if(check_sums(data, prefix_sums))
   {
     printf("Correctness confirmed!\n");
@@ -164,9 +176,10 @@ int main(int argc, char *argv[]) {
   {
     printf("Algorithm is not correct.\n");
   }
+  printf("done.\n");
 
   // Display timing results
-  print_elapsed("Summation", &start, &end);
+  print_elapsed("Prefix Sum", &start, &end);
 
   return 0;
 }

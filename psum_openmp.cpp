@@ -19,8 +19,6 @@
 
 #include <cmath>
 
-//#include "papi.h"
-
 using namespace std;
 
 /*==============================================================
@@ -169,7 +167,7 @@ int main(int argc, char *argv[]) {
     {
       int num = rand();
       data[i] = num;
-      prefix_sums[i] = data[i];
+      prefix_sums[i] = num;
     }
   }
 
