@@ -6,8 +6,8 @@
 /*---------------------------------------------------------
  *  Parallel Summation 
  *
- *  1. each processor generates numints random integers (in parallel)
- *  2. each processor sums his numints random integers (in parallel)
+ *  1. each processor generates mynumints random integers (in parallel)
+ *  2. each processor sums his mynumints random integers (in parallel)
  *  3  Time for processor-wise sums
  *  3.1  All the processes send their sum to Processor 0
  *  3.2  Processor 0 receives the local sum from all the other processes.
@@ -25,6 +25,8 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+
+#include <cmath>
 
 using namespace std;
 
@@ -85,17 +87,18 @@ void pass_prev_sums(int id, vector<long> &data, long *sum)
     {
         // Wait to receive local sum from lower neighbor proc
         MPI_Recv(sum, 1, MPI_LONG, id-1, 0, MPI_COMM_WORLD, &status);
-        printf("Node %d received sum %d from node %d\n", id, *sum, id-1);
+        //printf("Node %d received sum %d from node %d\n", id, *sum, id-1);
 
+        // Calculate new sum
         long newsum = *sum;
         newsum += data[data.size() - 1];
         *sum = newsum;
 
-        // Now pass new sum to upper neighbor proc
+        // Pass new sum to upper neighbor proc
         if(id < p-1)
         {
           MPI_Send(sum, 1, MPI_LONG, id+1, 0, MPI_COMM_WORLD);
-          printf("Node %d sent sum %d to node %d\n", id, *sum, id+1);
+          //printf("Node %d sent sum %d to node %d\n", id, *sum, id+1);
         }
     }
     else
@@ -103,12 +106,9 @@ void pass_prev_sums(int id, vector<long> &data, long *sum)
         // Master proc, send local sum to neighbor proc
         *sum = data[data.size() - 1];
 
-        // First, ensure all other nodes are ready to receive
-
-
         // sums will cascade upwards through neighbor procs
         MPI_Send(sum, 1, MPI_LONG, 1, 0, MPI_COMM_WORLD);
-        printf("Master node sent sum %d to node 1.\n", *sum);
+        //printf("Master node sent sum %d to node 1.\n", *sum);
     }
 
     //*sum = 0;
@@ -162,9 +162,9 @@ bool check_sums(const vector<long> &data, const vector<long> &prefix_sums, long 
  *==============================================================*/
 int main(int argc, char **argv) {
 
-  int nprocs, numints; // command line args
+  int nprocs, totalnumints; // command line args
 
-  int my_id;
+  int my_id, mynumints;
 
   long sum;             // sum of each individual processor
   long total_sum;       // Total sum 
@@ -203,20 +203,33 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  numints       = atoi(argv[1]);
+  totalnumints       = atoi(argv[1]);
 
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs); // Get number of processors
 
   if(my_id == 0)
-    printf("\nExecuting %s: nprocs=%d, numints=%d",
-            argv[0], nprocs, numints);
+    printf("\nExecuting %s: nprocs=%d, totalnumints=%d\n",
+            argv[0], nprocs, totalnumints);
 
   /*---------------------------------------------------------
    *  Initialization
    *  - allocate memory for work area structures and work area
    *---------------------------------------------------------*/
 
-  mymemory.reserve(numints);
+  // Determine how many ints to allocate for this node
+  // Scheme: give each <totalnumints / nprocs>, 
+  //    then give one extra to the first <totalnumints % nprocs> nodes
+  if(my_id < totalnumints % nprocs)
+  {
+      mynumints = ceil((double) totalnumints / nprocs);
+  }
+  else
+  {
+      mynumints = floor((double) totalnumints / nprocs);
+  }
+
+  printf("Processor %d is allocating %d nodes.\n", my_id, mynumints);
+  mymemory.reserve(mynumints);
   buffer = (long *) malloc(sizeof(long));
 
   if(buffer == NULL) {
@@ -229,7 +242,7 @@ int main(int argc, char **argv) {
   // Generate data
   gettimeofday(&gen_start, &tzp);
   srand(my_id + time(NULL));                  // Seed rand functions
-  p_generate_random_ints(mymemory, numints, my_id);  // random parallel fill
+  p_generate_random_ints(mymemory, mynumints, my_id);  // random parallel fill
   gettimeofday(&gen_end, &tzp);
 
   if(my_id == 0) {
