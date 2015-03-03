@@ -39,8 +39,8 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
   // generate & write this processor's random integers
   for (int i = 0; i < n; ++i) {
 
-    //memory.push_back(rand());
-    memory.push_back((n*id) + (i+1));
+    memory.push_back(rand());
+    //memory.push_back((n*id) + (i+1));
   }
   return;
 }
