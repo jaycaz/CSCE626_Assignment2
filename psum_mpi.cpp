@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <iostream>
 
+#include <fstream>
 #include <cmath>
 
 using namespace std;
@@ -34,11 +35,9 @@ using namespace std;
  * p_generate_random_ints (processor-wise generation of random ints)
  *==============================================================*/
 void p_generate_random_ints(vector<long>& memory, int n, int id) {
-
-  int i;
-
+  
   // generate & write this processor's random integers
-  for (i = 0; i < n; ++i) {
+  for (int i = 0; i < n; ++i) {
 
     //memory.push_back(rand());
     memory.push_back((n*id) + (i+1));
@@ -156,6 +155,32 @@ bool check_sums(const vector<long> &data, const vector<long> &prefix_sums, long 
   return true;
 }
 
+void write_all_data(int id, const vector<long> &data, fstream &f)
+{
+    char baton = 0;
+    MPI_Status status;
+    int p; // Total num processors
+    MPI_Comm_size(MPI_COMM_WORLD, &p); // Get number of processors
+
+    // Non-master nodes: wait to receive baton from prev node
+    if(id > 0)
+    {
+        MPI_Recv(&baton, 1, MPI_BYTE, id-1, 0, MPI_COMM_WORLD, &status);
+    }
+
+    // Master node: print data
+    for(int i = 0; i < data.size(); i++)
+    {
+        f << data[i] << endl;
+    }
+
+    // Pass baton to next node
+    if(id < p-1)
+    {
+        MPI_Send(&baton, 1, MPI_BYTE, id+1, 0, MPI_COMM_WORLD);
+    }
+}
+
 
 /*==============================================================
  *  Main Program (Parallel Summation)
@@ -169,6 +194,7 @@ int main(int argc, char **argv) {
   long sum;             // sum of each individual processor
   long total_sum;       // Total sum 
 
+  fstream datafile, psumfile; // Streams to data storage files
   vector<long> mymemory; // Vector to store processes numbers       
   long* buffer;         // Buffer for inter-processor communication
 
@@ -216,6 +242,17 @@ int main(int argc, char **argv) {
    *  - allocate memory for work area structures and work area
    *---------------------------------------------------------*/
 
+  if(my_id == 0)
+  {
+    datafile.open("data.txt", fstream::out | fstream::trunc);
+    datafile.close();
+    psumfile.open("psums.txt", fstream::out | fstream::trunc);
+    psumfile.close();
+  }
+
+  datafile.open("data.txt", fstream::out | fstream::app);
+  psumfile.open("psums.txt", fstream::out | fstream::app);
+
   // Determine how many ints to allocate for this node
   // Scheme: give each <totalnumints / nprocs>, 
   //    then give one extra to the first <totalnumints % nprocs> nodes
@@ -250,12 +287,16 @@ int main(int argc, char **argv) {
     print_elapsed("Input generated", &gen_start, &gen_end);
   }
 
-  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
 
-  // Print data before prefix sum
-  printf("Node %d Data: [", my_id);
-  for(int i = 0; i < mymemory.size(); i++) printf("%ld, ", mymemory[i]);
-  printf("]\n");
+  // Write out data before prefix sum
+  write_all_data(my_id, mymemory, datafile);
+  datafile.close();
+  if(my_id == 0)
+  {
+    printf("Initial data written to 'data.txt'.\n");
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
 
   // Start timing
   gettimeofday(&start, &tzp);
@@ -266,55 +307,18 @@ int main(int argc, char **argv) {
   // End timing
   gettimeofday(&end,&tzp);
 
-  // Print data after prefix sum
-  printf("Node %d Psums: [", my_id);
-  for(int i = 0; i < mymemory.size(); i++) printf("%ld, ", mymemory[i]);
-  printf("]\n");
 
+  // Write out data after prefix sum
+  write_all_data(my_id, mymemory, psumfile);
+  psumfile.close();
+
+  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
   if(my_id == 0);
   {
+    printf("Prefix sums written to 'psums.txt'.\n");
     print_elapsed("Prefix Sum", &start, &end);
   }
 
-  /*
-  sum = p_summation(mymemory); // Compute the local summation
-
-
-  if (my_id == 0) {
-
-    //this is the master processor
-
-    //init total sum with p0's sum
-    total_sum = sum;
-
-    for(int i = 1; i < nprocs; ++i) {
-
-      // Receive the message from the ANY processor
-      // The message is stored into "buffer" variable
-      MPI_Recv(buffer, 1, MPI_LONG, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-
-      // Add the processor-wise sum to the total sum
-      total_sum += *buffer;
-    }
-  }
-  else {
-
-    // this is not the master processor
-    // Send the local sum to the master process, which has ID = 0
-    MPI_Send(&sum, 1, MPI_LONG, 0, 0, MPI_COMM_WORLD);
-  }
-
-  // Processor 0 sends the result to all other processors
-  MPI_Bcast (&total_sum, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-
-  if(my_id == 0) {
-
-    gettimeofday(&end,&tzp);
-
-    print_elapsed("Summation", &start, &end);
-    printf("\n Total sum = %6ld\n", total_sum);
-  }
-  */
 
   /*---------------------------------------------------------
    *  Cleanup

@@ -33,4 +33,6 @@ psum_openmp
 psum_mpi
 psum_mpi2
 *.job.*
+data.txt
+psums.txt
 
