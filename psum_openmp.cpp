@@ -17,6 +17,7 @@
 #include <vector>
 #include <algorithm>
 
+#include <fstream>
 #include <cmath>
 
 using namespace std;
@@ -38,6 +39,7 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
 
   printf("\n %s total elapsed time = %ld (usec)\n",
     desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
+  fflush(stdout);
 }
 
 /*==============================================================
@@ -118,14 +120,28 @@ bool check_sums(const vector<long> &data, const vector<long> &prefix_sums)
 }
 
 /*==============================================================
+ * Write data out to fstream
+ *==============================================================*/
+void write_all_data(const vector<long> &data, fstream &f)
+{
+    for(int i = 0; i < data.size(); i++)
+    {
+        f << data[i] << endl;
+    }
+}
+
+
+/*==============================================================
  *  Main Program (Parallel Prefix Summation)
  *==============================================================*/
 int main(int argc, char *argv[]) {
 
-  // Initialize values
-
+  // Command Line Args
   int numints = 0;
   int numthreads = 1;
+  bool writedata = true;
+
+  fstream datafile, psumfile; // Streams to data storage files
 
   vector<long> data;
   vector<long> prefix_sums;
@@ -136,8 +152,15 @@ int main(int argc, char *argv[]) {
   // Command line arguments
 
   if( argc < 3) {
-    printf("Usage: %s [nthreads] [numints] \n\n", argv[0]);
+    printf("Usage: %s [nthreads] [numints] [[writedata]]\n\n", argv[0]);
     exit(1);
+  }
+  if(argc == 4)
+  {
+      if(atoi(argv[3]) == 0)
+      {
+          writedata = false;
+      }
   }
 
   numthreads = atoi(argv[1]);
@@ -148,6 +171,10 @@ int main(int argc, char *argv[]) {
   printf("\nExecuting %s: nthreads=%d, numints=%d\n",
             argv[0], omp_get_max_threads(), numints);
 
+  // Clear data files
+  datafile.open("data.txt", fstream::out | fstream::trunc);
+  psumfile.open("psums.txt", fstream::out | fstream::trunc);
+
   // Allocate shared memory for original data and new prefix sums
   printf("Allocating %ld bytes of input memory...", numints * sizeof(int) * 2);
   fflush(stdout);
@@ -155,14 +182,12 @@ int main(int argc, char *argv[]) {
   prefix_sums.resize(numints);
   printf("done.\n");
 
-  // Generate random ints in parallel
+  // Generate random ints
   printf("Generating input data...");
   fflush(stdout);
-  //#pragma omp parallel
   {
     srand(omp_get_thread_num() * int(time(NULL)));
 
-    //#pragma omp for
     for(int i = 0; i < data.size(); i++)
     {
       int num = rand();
@@ -171,7 +196,17 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  // Write out initial data
+  if(writedata)
+  {
+    write_all_data(data, datafile);
+    printf("Initial data written to 'data.txt'.\n");
+    fflush(stdout);
+  }
+  datafile.close();
+
   printf("done.\n");
+  fflush(stdout);
 
   printf("Calculating prefix sum...");
   fflush(stdout);
@@ -186,7 +221,18 @@ int main(int argc, char *argv[]) {
   gettimeofday(&end,&tzp);
 
   printf("done.\n");
+  fflush(stdout);
 
+  // Write out prefix sum data
+  if(writedata)
+  {
+    write_all_data(prefix_sums, psumfile);
+    printf("Prefix sum data written to 'psum.txt'.\n");
+    fflush(stdout);
+  }
+  psumfile.close();
+
+  /*
   // Display checksum results
   printf("Checking correctness...");
   fflush(stdout);
@@ -199,10 +245,12 @@ int main(int argc, char *argv[]) {
     printf("Algorithm is not correct.\n");
   }
   printf("done.\n");
+  */
 
   // Display timing results
   print_elapsed("Prefix Sum", &start, &end);
 
   return 0;
 }
+
 
