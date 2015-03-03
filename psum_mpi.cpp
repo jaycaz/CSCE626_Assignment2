@@ -64,6 +64,9 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
     desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
 }
 
+/*==============================================================
+ * Sequential Prefix Sum phase (each node finds its local prefix sums)
+ *==============================================================*/
 void seq_prefix_sum(int id, vector<long> &data)
 {
     int sum = 0;
@@ -73,9 +76,12 @@ void seq_prefix_sum(int id, vector<long> &data)
         sum += data[i];
         data[i] = sum;
     }
-    printf("Node %d completed sequential prefix sum\n", id);
+    //printf("Node %d completed sequential prefix sum\n", id);
 }
 
+/*==============================================================
+ * Sum Passing Phase (each node passes its local sum onwards)
+ *==============================================================*/
 void pass_prev_sums(int id, vector<long> &data, long *sum)
 {
     MPI_Status status;
@@ -113,6 +119,9 @@ void pass_prev_sums(int id, vector<long> &data, long *sum)
     //*sum = 0;
 }
 
+/*==============================================================
+ * Sum Sweeping Phase (each node takes the passed sum and adds it to its data)
+ *==============================================================*/
 void sweep_prev_sum(int id, vector<long> &data, long *sum)
 {
     *sum = *sum - data[data.size() - 1];
@@ -126,6 +135,9 @@ void sweep_prev_sum(int id, vector<long> &data, long *sum)
     }
 }
 
+/*==============================================================
+ * Complete prefix sum algorithm
+ *==============================================================*/
 void prefix_sum(int id, vector<long> &data, long *buffer)
 {
     seq_prefix_sum(id, data);
@@ -135,26 +147,8 @@ void prefix_sum(int id, vector<long> &data, long *buffer)
 
 
 /*==============================================================
- * check_sums (Verifies prefix sum algorithm works with data)
+ * Consolidate all nodes' data and write to fstream
  *==============================================================*/
-bool check_sums(const vector<long> &data, const vector<long> &prefix_sums, long offset)
-{
-  long sum = offset;
-
-  for(int i = 0; i < data.size(); i++)
-  {
-    sum += data[i];
-    if(prefix_sums[i] != sum)    
-    {
-      printf("Algorithm incorrect at index %d:\n", i);
-      printf("\tExpected: %d; Actual: %d\n", sum, data[i]);
-      return false;
-    }
-  }
-
-  return true;
-}
-
 void write_all_data(int id, const vector<long> &data, fstream &f)
 {
     char baton = 0;
@@ -188,14 +182,10 @@ void write_all_data(int id, const vector<long> &data, fstream &f)
 int main(int argc, char **argv) {
 
   int nprocs, totalnumints; // command line args
-
-  int my_id, mynumints;
-
-  long sum;             // sum of each individual processor
-  long total_sum;       // Total sum 
+  int my_id, mynumints; // Node-specific info
 
   fstream datafile, psumfile; // Streams to data storage files
-  vector<long> mymemory; // Vector to store processes numbers       
+  vector<long> mymemory; // Vector to store processor data       
   long* buffer;         // Buffer for inter-processor communication
 
   struct timeval gen_start, gen_end; // gettimeofday stuff
@@ -204,22 +194,12 @@ int main(int argc, char **argv) {
 
   MPI_Status status;              // Status variable for MPI operations
 
-  /*---------------------------------------------------------
-   * Initializing the MPI environment
-   * "nprocs" copies of this program will be initiated by MPI.
-   * All the variables will be private, only the program owner could see its own variables
-   * If there must be a inter-procesor communication, the communication must be
-   * done explicitly using MPI communication functions.
-   *---------------------------------------------------------*/
-
+  // Initializing the MPI environment
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &my_id); // Getting the ID for this process
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs); // Get number of processors
 
-  /*---------------------------------------------------------
-   *  Read Command Line
-   *  - check usage and parse args
-   *---------------------------------------------------------*/
-
+  // Read Command Line - check usage and parse args
   if(argc < 2) {
 
     if(my_id == 0)
@@ -229,19 +209,14 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  totalnumints       = atoi(argv[1]);
-
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs); // Get number of processors
+  totalnumints = atoi(argv[1]);
 
   if(my_id == 0)
     printf("\nExecuting %s: nprocs=%d, totalnumints=%d\n",
             argv[0], nprocs, totalnumints);
 
-  /*---------------------------------------------------------
-   *  Initialization
-   *  - allocate memory for work area structures and work area
-   *---------------------------------------------------------*/
 
+  // Clear data files
   if(my_id == 0)
   {
     datafile.open("data.txt", fstream::out | fstream::trunc);
@@ -253,6 +228,8 @@ int main(int argc, char **argv) {
   datafile.open("data.txt", fstream::out | fstream::app);
   psumfile.open("psums.txt", fstream::out | fstream::app);
 
+  // Initialization - allocate memory for work area structures and work area
+  //
   // Determine how many ints to allocate for this node
   // Scheme: give each <totalnumints / nprocs>, 
   //    then give one extra to the first <totalnumints % nprocs> nodes
@@ -265,7 +242,7 @@ int main(int argc, char **argv) {
       mynumints = floor((double) totalnumints / nprocs);
   }
 
-  printf("Processor %d is allocating %d nodes.\n", my_id, mynumints);
+  //printf("Processor %d is allocating %d nodes.\n", my_id, mynumints);
   mymemory.reserve(mynumints);
   buffer = (long *) malloc(sizeof(long));
 
@@ -276,7 +253,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  // Generate data
+  // Generate intitial data
   gettimeofday(&gen_start, &tzp);
   srand(my_id + time(NULL));                  // Seed rand functions
   p_generate_random_ints(mymemory, mynumints, my_id);  // random parallel fill
@@ -288,12 +265,14 @@ int main(int argc, char **argv) {
   }
 
 
-  // Write out data before prefix sum
+  // Write out initial data
   write_all_data(my_id, mymemory, datafile);
   datafile.close();
   if(my_id == 0)
   {
     printf("Initial data written to 'data.txt'.\n");
+    printf("Performing prefix sum... ");
+    fflush(stdout);
   }
 
   MPI_Barrier(MPI_COMM_WORLD); // Global barrier
@@ -307,23 +286,24 @@ int main(int argc, char **argv) {
   // End timing
   gettimeofday(&end,&tzp);
 
+  if(my_id == 0)
+  {
+    printf("done.\n");
+    fflush(stdout);
+  }
 
   // Write out data after prefix sum
   write_all_data(my_id, mymemory, psumfile);
   psumfile.close();
 
   MPI_Barrier(MPI_COMM_WORLD); // Global barrier
-  if(my_id == 0);
+
+  if(my_id == 0)
   {
     printf("Prefix sums written to 'psums.txt'.\n");
     print_elapsed("Prefix Sum", &start, &end);
   }
 
-
-  /*---------------------------------------------------------
-   *  Cleanup
-   *  - free memory
-   *---------------------------------------------------------*/
 
   // free memory
   free(buffer);
