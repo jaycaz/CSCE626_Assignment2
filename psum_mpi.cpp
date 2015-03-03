@@ -60,8 +60,9 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
   elapsed.tv_usec = end->tv_usec - start->tv_usec;
   elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-  printf("\n %s total elapsed time = %ld (usec)\n",
+  printf("\t%s total elapsed time = %ld (usec)\n",
     desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
+  fflush(stdout);
 }
 
 /*==============================================================
@@ -112,7 +113,10 @@ void pass_prev_sums(int id, vector<long> &data, long *sum)
         *sum = data[data.size() - 1];
 
         // sums will cascade upwards through neighbor procs
-        MPI_Send(sum, 1, MPI_LONG, 1, 0, MPI_COMM_WORLD);
+        if(p > 1)
+        {
+            MPI_Send(sum, 1, MPI_LONG, 1, 0, MPI_COMM_WORLD);
+        }
         //printf("Master node sent sum %d to node 1.\n", *sum);
     }
 
@@ -181,7 +185,10 @@ void write_all_data(int id, const vector<long> &data, fstream &f)
  *==============================================================*/
 int main(int argc, char **argv) {
 
-  int nprocs, totalnumints; // command line args
+  // Command line args
+  int nprocs, totalnumints;
+  bool writedata = true; // Triggers writing out of data and psums
+
   int my_id, mynumints; // Node-specific info
 
   fstream datafile, psumfile; // Streams to data storage files
@@ -203,13 +210,20 @@ int main(int argc, char **argv) {
   if(argc < 2) {
 
     if(my_id == 0)
-      printf("Usage: %s [numints]\n\n", argv[0]);
+      printf("Usage: %s [numints] [[writedata]]\n\n", argv[0]);
 
     MPI_Finalize();
     exit(1);
   }
 
   totalnumints = atoi(argv[1]);
+  if(argc == 3)
+  {
+      if(atoi(argv[2]) == 0)
+      {
+          writedata = false;
+      }
+  }
 
   if(my_id == 0)
     printf("\nExecuting %s: nprocs=%d, totalnumints=%d\n",
@@ -217,7 +231,7 @@ int main(int argc, char **argv) {
 
 
   // Clear data files
-  if(my_id == 0)
+  if(my_id == 0 && writedata)
   {
     datafile.open("data.txt", fstream::out | fstream::trunc);
     datafile.close();
@@ -249,6 +263,7 @@ int main(int argc, char **argv) {
   if(buffer == NULL) {
 
     printf("Processor %d - unable to malloc()\n", my_id);
+    fflush(stdout);
     MPI_Finalize();
     exit(1);
   }
@@ -266,11 +281,15 @@ int main(int argc, char **argv) {
 
 
   // Write out initial data
-  write_all_data(my_id, mymemory, datafile);
+  if(writedata)
+  {
+    write_all_data(my_id, mymemory, datafile);
+  }
   datafile.close();
+
   if(my_id == 0)
   {
-    printf("Initial data written to 'data.txt'.\n");
+    if(writedata) printf("Initial data written to 'data.txt'.\n");
     printf("Performing prefix sum... ");
     fflush(stdout);
   }
@@ -293,17 +312,20 @@ int main(int argc, char **argv) {
   }
 
   // Write out data after prefix sum
-  write_all_data(my_id, mymemory, psumfile);
+  if(writedata)
+  {
+    write_all_data(my_id, mymemory, psumfile);
+  }
   psumfile.close();
-
-  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
 
   if(my_id == 0)
   {
-    printf("Prefix sums written to 'psums.txt'.\n");
+    if(writedata) printf("Prefix sums written to 'psums.txt'.\n");
+    fflush(stdout);
     print_elapsed("Prefix Sum", &start, &end);
   }
 
+  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
 
   // free memory
   free(buffer);
