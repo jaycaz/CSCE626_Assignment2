@@ -33,75 +33,19 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
     desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
 }
 
-/*==============================================================
- * up_sweep (performs up-sweep step of prefix sum alg.)
- *==============================================================*/
-void up_sweep(vector<long> &nums)
-{
-  int n = nums.size();
-  int nceil = (int) pow(2, ceil(log2(n))); 
-  int h = (int) log2(nceil);
-
-  for(int i = 1; i <= h; i++)
-  {
-    int step = (int) pow(2.0, i); 
-
-    for(int j = step-1; j < n; j += step)
-    {
-      nums[j] += nums[j - step/2];
-    }
-  }
-}
-
-/*==============================================================
- * down_sweep (performs down-sweep step of prefix sum alg.)
- *==============================================================*/
-void down_sweep(vector<long> &nums)
-{
-  int n = nums.size();
-  int nceil = (int) pow(2, ceil(log2(n)));
-  int h = (int) log2(nceil);
-
-  for(int i = h-1; i > 0; i--)
-  {
-    int step = (int) pow(2.0, i); 
-
-    for(int j = step-1; j < n - step/2; j += step)
-    {
-      nums[j + step/2] += nums[j];
-    }
-  }
-  
-}
 
 /*==============================================================
  * prefix_sum (combines up-sweep and down-sweep steps)
  *==============================================================*/
 void prefix_sum(vector<long> &nums)
 {
-  up_sweep(nums);
-  down_sweep(nums);
-}
+    long sum = 0;
 
-/*==============================================================
- * check_sums (Verifies prefix sum algorithm works with data)
- *==============================================================*/
-bool check_sums(const vector<long> &data, const vector<long> &prefix_sums)
-{
-  long sum = 0;
-
-  for(int i = 0; i < data.size(); i++)
-  {
-    sum += data[i];
-    if(prefix_sums[i] != sum)    
+    for(int i = 0; i < nums.size(); i++)
     {
-      printf("Algorithm incorrect at index %d:\n", i);
-      printf("\tExpected: %d; Actual: %d\n", sum, data[i]);
-      return false;
+        sum += nums[i];
+        nums[i] = sum;
     }
-  }
-
-  return true;
 }
 
 /*==============================================================
@@ -112,32 +56,28 @@ int main(int argc, char *argv[]) {
   // Initialize values
 
   int numints = 0;
-  int numthreads = 1;
 
   vector<long> data;
-  vector<long> prefix_sums;
 
   struct timeval start, end;   // gettimeofday stuff
   struct timezone tzp;
 
   // Command line arguments
 
-  if( argc < 3) {
-    printf("Usage: %s [nthreads] [numints] \n\n", argv[0]);
+  if( argc < 2) {
+    printf("Usage: %s [numints] \n\n", argv[0]);
     exit(1);
   }
 
-  numthreads = atoi(argv[1]);
-  numints = atoi(argv[2]);
+  numints = atoi(argv[1]);
 
-  printf("\nExecuting %s: nthreads=%d, numints=%d\n",
+  printf("\nExecuting %s: numints=%d\n",
             argv[0], 1, numints);
 
   // Allocate shared memory for original data and new prefix sums
   printf("Allocating %ld bytes of input memory...", numints * sizeof(int) * 2);
   fflush(stdout);
   data.resize(numints);
-  prefix_sums.resize(numints);
   printf("done.\n");
 
   // Generate random ints in parallel
@@ -147,7 +87,7 @@ int main(int argc, char *argv[]) {
   {
     int num = rand();
     data[i] = num;
-    prefix_sums[i] = num;
+    data[i] = num;
   }
   printf("done.\n");
 
@@ -158,24 +98,11 @@ int main(int argc, char *argv[]) {
   gettimeofday(&start, &tzp);
 
   // Calculate prefix sums for generated data
-  prefix_sum(prefix_sums);
+  prefix_sum(data);
 
   // End timing
   gettimeofday(&end,&tzp);
 
-  printf("done.\n");
-
-  // Display checksum results
-  printf("Checking correctness...");
-  fflush(stdout);
-  if(check_sums(data, prefix_sums))
-  {
-    printf("Correctness confirmed!\n");
-  }
-  else
-  {
-    printf("Algorithm is not correct.\n");
-  }
   printf("done.\n");
 
   // Display timing results
