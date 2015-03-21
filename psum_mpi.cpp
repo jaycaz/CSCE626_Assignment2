@@ -29,6 +29,11 @@
 #include <fstream>
 #include <cmath>
 
+#define DEFAULT_NUM_INTS 10000000
+#define DEFAULT_NUM_ITERS 1
+#define DEFAULT_FILENAME "data.txt"
+#define DEFAULT_NUM_TRIALS 50    
+
 using namespace std;
 
 /*==============================================================
@@ -48,9 +53,10 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
 /*==============================================================
  * print_elapsed (prints timing statistics)
  *==============================================================*/
- void print_elapsed(const char* desc, struct timeval* start, struct timeval* end) {
+long get_elapsed(struct timeval* start, struct timeval* end) {
 
   struct timeval elapsed;
+
   // calculate elapsed time
   if(start->tv_usec > end->tv_usec) {
 
@@ -60,9 +66,9 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
   elapsed.tv_usec = end->tv_usec - start->tv_usec;
   elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-  printf("\t%s total elapsed time = %ld (usec)\n",
-    desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
-  fflush(stdout);
+  long elapsedusec = (elapsed.tv_sec * 1000000) + elapsed.tv_usec;
+
+  return elapsedusec;
 }
 
 /*==============================================================
@@ -151,53 +157,25 @@ void prefix_sum(int id, vector<long> &data, long *buffer)
 
 
 /*==============================================================
- * Consolidate all nodes' data and write to fstream
- *==============================================================*/
-void write_all_data(int id, const vector<long> &data, fstream &f)
-{
-    char baton = 0;
-    MPI_Status status;
-    int p; // Total num processors
-    MPI_Comm_size(MPI_COMM_WORLD, &p); // Get number of processors
-
-    // Non-master nodes: wait to receive baton from prev node
-    if(id > 0)
-    {
-        MPI_Recv(&baton, 1, MPI_BYTE, id-1, 0, MPI_COMM_WORLD, &status);
-    }
-
-    // Master node: print data
-    for(int i = 0; i < data.size(); i++)
-    {
-        f << data[i] << endl;
-    }
-
-    // Pass baton to next node
-    if(id < p-1)
-    {
-        MPI_Send(&baton, 1, MPI_BYTE, id+1, 0, MPI_COMM_WORLD);
-    }
-}
-
-
-/*==============================================================
  *  Main Program (Parallel Summation)
  *==============================================================*/
 int main(int argc, char **argv) {
 
   // Command line args
-  int nprocs, totalnumints;
-  bool writedata = true; // Triggers writing out of data and psums
+  int nprocs, totalnumints, totalnumiters;
+  bool writedata = false; // Triggers writing out of data and psums
 
   int my_id, mynumints; // Node-specific info
 
+  string datafilename;
   fstream datafile, psumfile; // Streams to data storage files
   vector<long> mymemory; // Vector to store processor data       
   long* buffer;         // Buffer for inter-processor communication
 
-  struct timeval gen_start, gen_end; // gettimeofday stuff
   struct timeval start, end;         // gettimeofday stuff
   struct timezone tzp;
+
+  vector<long> times;  // Store list of times
 
   MPI_Status status;              // Status variable for MPI operations
 
@@ -210,37 +188,33 @@ int main(int argc, char **argv) {
   if(argc < 2) {
 
     if(my_id == 0)
-      printf("Usage: %s [numints] [[writedata]]\n\n", argv[0]);
+      printf("Usage: %s [numints] [optional: numiters] [optional: writedatafile]\n\n", argv[0]);
 
     MPI_Finalize();
     exit(1);
   }
 
   totalnumints = atoi(argv[1]);
-  if(argc == 3)
+  if(argc >= 3)
   {
-      if(atoi(argv[2]) == 0)
-      {
-          writedata = false;
-      }
+      totalnumiters = atoi(argv[2]);
+  }
+  if(argc >= 4)
+  {
+      writedata = true;
+      datafilename = argv[3];
   }
 
   if(my_id == 0)
-    printf("\nExecuting %s: nprocs=%d, totalnumints=%d\n",
-            argv[0], nprocs, totalnumints);
+    printf("\nExecuting %s: nprocs=%d, totalnumints=%d, totalnumiters=%d\n",
+            argv[0], nprocs, totalnumints, totalnumiters);
 
 
   // Clear data files
   if(my_id == 0 && writedata)
   {
-    datafile.open("data.txt", fstream::out | fstream::trunc);
-    datafile.close();
-    psumfile.open("psums.txt", fstream::out | fstream::trunc);
-    psumfile.close();
+    datafile.open(datafilename.c_str(), fstream::out | fstream::trunc);
   }
-
-  datafile.open("data.txt", fstream::out | fstream::app);
-  psumfile.open("psums.txt", fstream::out | fstream::app);
 
   // Initialization - allocate memory for work area structures and work area
   //
@@ -269,65 +243,70 @@ int main(int argc, char **argv) {
   }
 
   // Generate intitial data
-  gettimeofday(&gen_start, &tzp);
   srand(my_id + time(NULL));                  // Seed rand functions
   p_generate_random_ints(mymemory, mynumints, my_id);  // random parallel fill
-  gettimeofday(&gen_end, &tzp);
 
-  if(my_id == 0) {
-
-    print_elapsed("Input generated", &gen_start, &gen_end);
-  }
-
-
-  // Write out initial data
-  if(writedata)
+  if(my_id == 0)
   {
-    write_all_data(my_id, mymemory, datafile);
+    printf("Performing prefix sum... \n");
+    fflush(stdout);
   }
+
+  // Iterate <numiters> times
+  for(int i = 0; i < totalnumiters; i++)
+  {
+    if(my_id == 0)
+    {
+      printf("\tIteration %d...", i);
+      fflush(stdout);
+    }
+    MPI_Barrier(MPI_COMM_WORLD); // Global barrier
+
+    // Start timing
+    gettimeofday(&start, &tzp);
+
+    // Perform prefix sum
+    prefix_sum(my_id, mymemory, buffer);
+
+    // End timing
+    gettimeofday(&end,&tzp);
+
+    long elapsed = get_elapsed(&start, &end);
+    times.push_back(elapsed);
+
+    if(my_id == 0)
+    {
+      printf("done (%d usec).\n", elapsed);
+      fflush(stdout);
+    }
+  }
+
+  // Calculate average time elapsed
+  long totaltime = 0;
+  for(int i = 0; i < times.size(); i++)
+  {
+      totaltime += times[i];
+  }
+  double avgtime = (double) totaltime / times.size();
+
+  if(my_id == 0)
+  {
+    printf("...done (avg: %f usec).\n", avgtime);
+    fflush(stdout);
+  }
+
+  if(my_id == 0 && writedata)
+  {
+    datafile << avgtime << endl;
+    printf("Avg. time written to %s\n", datafilename.c_str());
+    printf("\n");
+    fflush(stdout);
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
+
+  // cleanup
   datafile.close();
-
-  if(my_id == 0)
-  {
-    if(writedata) printf("Initial data written to 'data.txt'.\n");
-    printf("Performing prefix sum... ");
-    fflush(stdout);
-  }
-
-  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
-
-  // Start timing
-  gettimeofday(&start, &tzp);
-
-  // Perform prefix sum
-  prefix_sum(my_id, mymemory, buffer);
-
-  // End timing
-  gettimeofday(&end,&tzp);
-
-  if(my_id == 0)
-  {
-    printf("done.\n");
-    fflush(stdout);
-  }
-
-  // Write out data after prefix sum
-  if(writedata)
-  {
-    write_all_data(my_id, mymemory, psumfile);
-  }
-  psumfile.close();
-
-  if(my_id == 0)
-  {
-    if(writedata) printf("Prefix sums written to 'psums.txt'.\n");
-    fflush(stdout);
-    print_elapsed("Prefix Sum", &start, &end);
-  }
-
-  MPI_Barrier(MPI_COMM_WORLD); // Global barrier
-
-  // free memory
   free(buffer);
 
   MPI_Finalize();
