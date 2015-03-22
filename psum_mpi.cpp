@@ -163,12 +163,10 @@ int main(int argc, char **argv) {
 
   // Command line args
   int nprocs, totalnumints, totalnumiters;
-  bool writedata = false; // Triggers writing out of data and psums
+  bool debugmode = false; // Triggers writing out of data and psums
 
   int my_id, mynumints; // Node-specific info
 
-  string datafilename;
-  fstream datafile, psumfile; // Streams to data storage files
   vector<long> mymemory; // Vector to store processor data       
   long* buffer;         // Buffer for inter-processor communication
 
@@ -188,7 +186,7 @@ int main(int argc, char **argv) {
   if(argc < 2) {
 
     if(my_id == 0)
-      printf("Usage: %s [numints] [optional: numiters] [optional: writedatafile]\n\n", argv[0]);
+      printf("Usage: %s [numints] [optional: numiters] [optional: debugmode]\n\n", argv[0]);
 
     MPI_Finalize();
     exit(1);
@@ -199,22 +197,15 @@ int main(int argc, char **argv) {
   {
       totalnumiters = atoi(argv[2]);
   }
-  if(argc >= 4)
+  if(argc >= 4 && atoi(argv[3]) == 1)
   {
-      writedata = true;
-      datafilename = argv[3];
+      debugmode = true;
   }
 
-  if(my_id == 0)
+  if(my_id == 0 && debugmode)
     printf("\nExecuting %s: nprocs=%d, totalnumints=%d, totalnumiters=%d\n",
             argv[0], nprocs, totalnumints, totalnumiters);
 
-
-  // Clear data files
-  if(my_id == 0 && writedata)
-  {
-    datafile.open(datafilename.c_str(), fstream::out | fstream::trunc);
-  }
 
   // Initialization - allocate memory for work area structures and work area
   //
@@ -246,7 +237,7 @@ int main(int argc, char **argv) {
   srand(my_id + time(NULL));                  // Seed rand functions
   p_generate_random_ints(mymemory, mynumints, my_id);  // random parallel fill
 
-  if(my_id == 0)
+  if(my_id == 0 && debugmode)
   {
     printf("Performing prefix sum... \n");
     fflush(stdout);
@@ -255,7 +246,7 @@ int main(int argc, char **argv) {
   // Iterate <numiters> times
   for(int i = 0; i < totalnumiters; i++)
   {
-    if(my_id == 0)
+    if(my_id == 0 && debugmode)
     {
       printf("\tIteration %d...", i);
       fflush(stdout);
@@ -274,7 +265,7 @@ int main(int argc, char **argv) {
     long elapsed = get_elapsed(&start, &end);
     times.push_back(elapsed);
 
-    if(my_id == 0)
+    if(my_id == 0 && debugmode)
     {
       printf("done (%d usec).\n", elapsed);
       fflush(stdout);
@@ -291,22 +282,21 @@ int main(int argc, char **argv) {
 
   if(my_id == 0)
   {
-    printf("...done (avg: %f usec).\n", avgtime);
-    fflush(stdout);
-  }
-
-  if(my_id == 0 && writedata)
-  {
-    datafile << avgtime << endl;
-    printf("Avg. time written to %s\n", datafilename.c_str());
-    printf("\n");
-    fflush(stdout);
+    if(debugmode)
+    {
+      printf("...done (avg: %f usec).\n", avgtime);
+      fflush(stdout);
+    }
+    else
+    {
+      printf("%f", avgtime);
+      fflush(stdout);
+    }
   }
 
   MPI_Barrier(MPI_COMM_WORLD); // Global barrier
 
   // cleanup
-  datafile.close();
   free(buffer);
 
   MPI_Finalize();
