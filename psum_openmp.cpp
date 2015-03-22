@@ -20,26 +20,32 @@
 #include <fstream>
 #include <cmath>
 
+#define DEFAULT_NUM_INTS 10000000
+#define DEFAULT_NUM_ITERS 50
+#define DEFAULT_NUM_THREADS 1
+
+
 using namespace std;
 
 /*==============================================================
- * print_elapsed (prints timing statistics)
+ * get_elapsed (retrieve time elapsed between start, end)
  *==============================================================*/
-void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
-{
-  struct timeval elapsed;
-  // calculate elapsed time
+long get_elapsed(struct timeval* start, struct timeval* end) {
 
+  struct timeval elapsed;
+
+  // calculate elapsed time
   if(start->tv_usec > end->tv_usec) {
+
     end->tv_usec += 1000000;
     end->tv_sec--;
   }
   elapsed.tv_usec = end->tv_usec - start->tv_usec;
   elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-  printf("\n %s total elapsed time = %ld (usec)\n",
-    desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
-  fflush(stdout);
+  long elapsedusec = (elapsed.tv_sec * 1000000) + elapsed.tv_usec;
+
+  return elapsedusec;
 }
 
 /*==============================================================
@@ -120,71 +126,57 @@ bool check_sums(const vector<long> &data, const vector<long> &prefix_sums)
 }
 
 /*==============================================================
- * Write data out to fstream
- *==============================================================*/
-void write_all_data(const vector<long> &data, fstream &f)
-{
-    for(int i = 0; i < data.size(); i++)
-    {
-        f << data[i] << endl;
-    }
-}
-
-
-/*==============================================================
  *  Main Program (Parallel Prefix Summation)
  *==============================================================*/
 int main(int argc, char *argv[]) {
 
   // Command Line Args
-  int numints = 0;
-  int numthreads = 1;
-  bool writedata = true;
-
-  fstream datafile, psumfile; // Streams to data storage files
+  int numints = DEFAULT_NUM_INTS;
+  int numiters = DEFAULT_NUM_ITERS;
+  int numthreads = DEFAULT_NUM_THREADS;
+  bool debugmode = false;
 
   vector<long> data;
   vector<long> prefix_sums;
 
   struct timeval start, end;   // gettimeofday stuff
   struct timezone tzp;
+  vector<long> times;  // Store times for each trial
 
   // Command line arguments
-
-  if( argc < 3) {
-    printf("Usage: %s [nthreads] [numints] [[writedata]]\n\n", argv[0]);
+  numints = DEFAULT_NUM_INTS;
+  numiters = DEFAULT_NUM_ITERS;
+  if(argc < 2) {
+    printf("Usage: %s [nthreads] [numints] [optional: numiters] [optional: debugmode]\n\n", argv[0]);
     exit(1);
   }
-  if(argc == 4)
-  {
-      if(atoi(argv[3]) == 0)
-      {
-          writedata = false;
-      }
-  }
-
   numthreads = atoi(argv[1]);
-  numints = atoi(argv[2]);
+  if(argc >= 3)
+  {
+    numints = atoi(argv[2]);
+  }
+  if(argc >= 4)
+  {
+    numiters = atoi(argv[3]);
+  }
+  if(argc >= 5 && atoi(argv[4]) == 1)
+  {
+    debugmode = true;
+  }
 
   omp_set_num_threads(numthreads);
 
-  printf("\nExecuting %s: nthreads=%d, numints=%d\n",
-            argv[0], omp_get_max_threads(), numints);
-
-  // Clear data files
-  datafile.open("data.txt", fstream::out | fstream::trunc);
-  psumfile.open("psums.txt", fstream::out | fstream::trunc);
+  if(debugmode)
+  {
+    printf("\nExecuting %s: nthreads=%d, numints=%d, numiters=%d\n",
+             argv[0], omp_get_max_threads(), numints, numiters);
+  }
 
   // Allocate shared memory for original data and new prefix sums
-  printf("Allocating %ld bytes of input memory...", numints * sizeof(int) * 2);
-  fflush(stdout);
   data.resize(numints);
   prefix_sums.resize(numints);
-  printf("done.\n");
 
   // Generate random ints
-  printf("Generating input data...");
-  fflush(stdout);
   {
     srand(omp_get_thread_num() * int(time(NULL)));
 
@@ -197,58 +189,58 @@ int main(int argc, char *argv[]) {
   }
 
   // Write out initial data
-  if(writedata)
+  if(debugmode)
   {
-    write_all_data(data, datafile);
-    printf("Initial data written to 'data.txt'.\n");
+    printf("Calculating prefix sum...\n");
     fflush(stdout);
   }
-  datafile.close();
 
-  printf("done.\n");
-  fflush(stdout);
+  // Iterate <numiters> times
+  for(int i = 0; i < numiters; i++)
+  {
+    if(debugmode)
+    {
+      printf("\tIteration %d...", i);
+      fflush(stdout);
+    }
 
-  printf("Calculating prefix sum...");
-  fflush(stdout);
+    // Start timing
+    gettimeofday(&start, &tzp);
 
-  // Begin timing
-  gettimeofday(&start, &tzp);
+    // Perform prefix sum
+    prefix_sum(prefix_sums);
 
-  // Calculate prefix sums for generated data
-  prefix_sum(prefix_sums);
+    // End timing
+    gettimeofday(&end,&tzp);
 
-  // End timing
-  gettimeofday(&end,&tzp);
+    long elapsed = get_elapsed(&start, &end);
+    times.push_back(elapsed);
 
-  printf("done.\n");
-  fflush(stdout);
+    if(debugmode)
+    {
+      printf("done (%d usec).\n", elapsed);
+      fflush(stdout);
+    }
+  }
+
+  // Calculate average time elapsed
+  long totaltime = 0;
+  for(int i = 0; i < times.size(); i++)
+  {
+      totaltime += times[i];
+  }
+  double avgtime = (double) totaltime / times.size(); 
 
   // Write out prefix sum data
-  if(writedata)
+  if(debugmode)
   {
-    write_all_data(prefix_sums, psumfile);
-    printf("Prefix sum data written to 'psum.txt'.\n");
+    printf("done (avg. time: %f usec).\n", avgtime);
     fflush(stdout);
-  }
-  psumfile.close();
-
-  /*
-  // Display checksum results
-  printf("Checking correctness...");
-  fflush(stdout);
-  if(check_sums(data, prefix_sums))
-  {
-    printf("Correctness confirmed!\n");
   }
   else
   {
-    printf("Algorithm is not correct.\n");
+    printf("%f", avgtime);
   }
-  printf("done.\n");
-  */
-
-  // Display timing results
-  print_elapsed("Prefix Sum", &start, &end);
 
   return 0;
 }
