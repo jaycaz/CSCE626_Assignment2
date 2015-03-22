@@ -12,14 +12,19 @@
 
 #include <cmath>
 
+#define DEFAULT_NUM_INTS 10000000
+#define DEFAULT_
+#define DEFAULT_NUM_ITERS 1
+
 using namespace std;
 
 /*==============================================================
- * print_elapsed (prints timing statistics)
+ * get_elapsed (retrieve time elapsed between start, end)
  *==============================================================*/
-void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
-{
+long get_elapsed(struct timeval* start, struct timeval* end) {
+
   struct timeval elapsed;
+
   // calculate elapsed time
   if(start->tv_usec > end->tv_usec) {
 
@@ -29,10 +34,10 @@ void print_elapsed(const char* desc, struct timeval* start, struct timeval* end)
   elapsed.tv_usec = end->tv_usec - start->tv_usec;
   elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-  printf("\n %s total elapsed time = %ld (usec)\n",
-    desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec));
-}
+  long elapsedusec = (elapsed.tv_sec * 1000000) + elapsed.tv_usec;
 
+  return elapsedusec;
+}
 
 /*==============================================================
  * prefix_sum (combines up-sweep and down-sweep steps)
@@ -53,61 +58,111 @@ void prefix_sum(vector<long> &nums)
  *==============================================================*/
 int main(int argc, char *argv[]) {
 
-  // Initialize values
-
-  int numints = 0;
+  // Command Line Args
+  int numints = DEFAULT_NUM_INTS;
+  int numiters = DEFAULT_NUM_ITERS;
+  bool debugmode = false;
 
   vector<long> data;
+  vector<long> prefix_sums;
 
   struct timeval start, end;   // gettimeofday stuff
   struct timezone tzp;
+  vector<long> times;  // Store times for each trial
 
   // Command line arguments
-
-  if( argc < 2) {
-    printf("Usage: %s [numints] \n\n", argv[0]);
+  numints = DEFAULT_NUM_INTS;
+  numiters = DEFAULT_NUM_ITERS;
+  if(argc < 2) {
+    printf("Usage: %s [numints] [optional: numiters] [optional: debugmode]\n\n", argv[0]);
     exit(1);
   }
+  if(argc >= 2)
+  {
+    numints = atoi(argv[1]);
+  }
+  if(argc >= 3)
+  {
+    numiters = atoi(argv[2]);
+  }
+  if(argc >= 4 && atoi(argv[3]) == 1)
+  {
+    debugmode = true;
+  }
 
-  numints = atoi(argv[1]);
-
-  printf("\nExecuting %s: numints=%d\n",
-            argv[0], 1, numints);
+  if(debugmode)
+  {
+    printf("\nExecuting %s: numints=%d, numiters=%d\n",
+             argv[0], numints, numiters);
+  }
 
   // Allocate shared memory for original data and new prefix sums
-  printf("Allocating %ld bytes of input memory...", numints * sizeof(int) * 2);
-  fflush(stdout);
   data.resize(numints);
-  printf("done.\n");
+  prefix_sums.resize(numints);
 
-  // Generate random ints in parallel
-  printf("Generating input data...");
-  fflush(stdout);
-  for(int i = 0; i < data.size(); i++)
+  // Generate random ints
   {
-    int num = rand();
-    data[i] = num;
-    data[i] = num;
+    for(int i = 0; i < data.size(); i++)
+    {
+      int num = rand();
+      data[i] = num;
+      prefix_sums[i] = num;
+    }
   }
-  printf("done.\n");
 
-  printf("Calculating prefix sum...");
-  fflush(stdout);
+  // Write out initial data
+  if(debugmode)
+  {
+    printf("Calculating prefix sum...\n");
+    fflush(stdout);
+  }
 
-  // Begin timing
-  gettimeofday(&start, &tzp);
+  // Iterate <numiters> times
+  for(int i = 0; i < numiters; i++)
+  {
+    if(debugmode)
+    {
+      printf("\tIteration %d...", i);
+      fflush(stdout);
+    }
 
-  // Calculate prefix sums for generated data
-  prefix_sum(data);
+    // Start timing
+    gettimeofday(&start, &tzp);
 
-  // End timing
-  gettimeofday(&end,&tzp);
+    // Perform prefix sum
+    prefix_sum(prefix_sums);
 
-  printf("done.\n");
+    // End timing
+    gettimeofday(&end,&tzp);
 
-  // Display timing results
-  print_elapsed("Prefix Sum", &start, &end);
+    long elapsed = get_elapsed(&start, &end);
+    times.push_back(elapsed);
+
+    if(debugmode)
+    {
+      printf("done (%d usec).\n", elapsed);
+      fflush(stdout);
+    }
+  }
+
+  // Calculate average time elapsed
+  long totaltime = 0;
+  for(int i = 0; i < times.size(); i++)
+  {
+      totaltime += times[i];
+  }
+  double avgtime = (double) totaltime / times.size(); 
+
+  // Write out prefix sum data
+  if(debugmode)
+  {
+    printf("done (avg. time: %f usec).\n", avgtime);
+    fflush(stdout);
+  }
+  else
+  {
+    printf("%f", avgtime);
+  }
 
   return 0;
 }
-
