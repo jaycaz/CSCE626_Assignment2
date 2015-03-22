@@ -51,7 +51,7 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
 }
 
 /*==============================================================
- * print_elapsed (prints timing statistics)
+ * get_elapsed (retrieve time elapsed between start, end)
  *==============================================================*/
 long get_elapsed(struct timeval* start, struct timeval* end) {
 
@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
   struct timeval start, end;         // gettimeofday stuff
   struct timezone tzp;
 
-  vector<long> times;  // Store list of times
+  vector<long> times;  // Store times for each trial
 
   MPI_Status status;              // Status variable for MPI operations
 
