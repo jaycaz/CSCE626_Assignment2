@@ -59,7 +59,8 @@ void up_sweep(vector<long> &nums)
 
   for(int i = 1; i <= h; i++)
   {
-    int step = (int) pow(2.0, i);
+    //int step = (int) pow(2.0, i);
+    int step = 1 << i;
 
     #pragma omp parallel for 
       for(int j = step-1; j < n; j += step)
@@ -82,7 +83,8 @@ void down_sweep(vector<long> &nums)
 
   for(int i = h-1; i > 0; i--)
   {
-    int step = (int) pow(2.0, i);
+    //int step = (int) pow(2.0, i);
+    int step = 1 << i;
 
     #pragma omp parallel for
       for(int j = step-1; j < n - step/2; j += step)
@@ -136,7 +138,7 @@ int main(int argc, char *argv[]) {
   int numthreads = DEFAULT_NUM_THREADS;
   bool debugmode = false;
 
-  vector<long> data;
+  //vector<long> data;
   vector<long> prefix_sums;
 
   struct timeval start, end;   // gettimeofday stuff
@@ -173,17 +175,17 @@ int main(int argc, char *argv[]) {
   }
 
   // Allocate shared memory for original data and new prefix sums
-  data.resize(numints);
+  //data.resize(numints);
   prefix_sums.resize(numints);
 
   // Generate random ints
   {
     srand(omp_get_thread_num() * int(time(NULL)));
 
-    for(int i = 0; i < data.size(); i++)
+    for(int i = 0; i < prefix_sums.size(); i++)//data.size(); i++)
     {
       int num = rand();
-      data[i] = num;
+      //data[i] = num;
       prefix_sums[i] = num;
     }
   }

@@ -3,17 +3,17 @@
 maxnums="1400000"
 startnum="500000"
 numinc="100000"
-maxthreads="12"
+maxthreads="4"
 startthread="1"
-iters="50"
+iters="5"
 
-writefile="testomp.txt"
+writefile="testmpi.txt"
 
 cat /dev/null > $writefile
 
 # Perform tests up to maxthreads and maxnums
 # Increase $nums linearly by $numinc
-# Increase $threads linearly by 1
+# Increase $threads by powers of 2
 thread=$startthread
 while [ $thread -le $maxthreads ]
 do
@@ -21,11 +21,11 @@ do
 	while [ $num -le $maxnums ]
     do
         printf "%d threads, %d nums\n" $thread $num
-		time=`./psum_openmp $thread $num $iters`
+		time=`mpirun -np $thread psum_mpi $num $iters 2>/dev/null`
         printf "%f\t" $time >> $writefile
 		wait
 		num=$[$num+$numinc]
 	done
-	thread=$[$thread+1]
+	thread=$[$thread*2]
 	printf "\n" >> $writefile
 done

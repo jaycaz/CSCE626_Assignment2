@@ -1,4 +1,4 @@
-#PBS -l nodes=1:ppn=12,mem=20gb,walltime=08:00:00
+#PBS -l nodes=1:ppn=12,mem=20gb,walltime=04:00:00
 #PBS -W NACCESSPOLICY:SINGLEJOB
 
 #
@@ -6,7 +6,8 @@
 source $PBS_O_WORKDIR/../setup_env.sh
 cd $PBS_O_WORKDIR
 
-# Run script
+#!/bin/bash
+
 maxnums="400000000"
 startnum="40000000"
 numinc="40000000"
@@ -14,11 +15,13 @@ maxthreads="12"
 startthread="1"
 iters="50"
 
-writefile="testomp2.txt"
+writefile="testmpi_onenode.txt"
 
 cat /dev/null > $writefile
 
 # Perform tests up to maxthreads and maxnums
+# Increase $nums linearly by $numinc
+# Increase $threads by powers of 2
 thread=$startthread
 while [ $thread -le $maxthreads ]
 do
@@ -26,7 +29,7 @@ do
 	while [ $num -le $maxnums ]
     do
         printf "%d threads, %d nums\n" $thread $num
-		time=`./psum_openmp $thread $num $iters`
+		time=`mpirun -np $thread psum_mpi $num $iters 2>/dev/null`
         printf "%f\t" $time >> $writefile
 		wait
 		num=$[$num+$numinc]
@@ -34,5 +37,6 @@ do
 	thread=$[$thread+1]
 	printf "\n" >> $writefile
 done
+
 
 # Post Processing

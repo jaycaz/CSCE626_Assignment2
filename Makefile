@@ -18,6 +18,7 @@ all: psum_seq psum_openmp psum_mpi
 
 psum_seq:psum_seq.cpp
 	$(CC) $(CFLAGS) $(DFLAGS) -fopenmp  -o $@ $@.cpp
+	cp $@ seqjobs
 
 #
 # OpenMP prefix sum program
@@ -40,6 +41,6 @@ psum_mpi:psum_mpi.cpp
 # clean up
 #
 clean:
-	rm psum_seq > /dev/null 2>&1
+	rm psum_seq seqjobs/psum_seq > /dev/null 2>&1
 	rm psum_openmp ompjobs/psum_openmp > /dev/null 2>&1
 	rm psum_mpi mpijobs/psum_mpi > /dev/null 2>&1
