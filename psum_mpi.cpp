@@ -45,7 +45,6 @@ void p_generate_random_ints(vector<long>& memory, int n, int id) {
   for (int i = 0; i < n; ++i) {
 
     memory.push_back(rand());
-    //memory.push_back((n*id) + (i+1));
   }
   return;
 }
@@ -125,8 +124,6 @@ void pass_prev_sums(int id, vector<long> &data, long *sum)
         }
         //printf("Master node sent sum %d to node 1.\n", *sum);
     }
-
-    //*sum = 0;
 }
 
 /*==============================================================

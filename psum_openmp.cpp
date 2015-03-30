@@ -138,7 +138,6 @@ int main(int argc, char *argv[]) {
   int numthreads = DEFAULT_NUM_THREADS;
   bool debugmode = false;
 
-  //vector<long> data;
   vector<long> prefix_sums;
 
   struct timeval start, end;   // gettimeofday stuff
@@ -174,23 +173,20 @@ int main(int argc, char *argv[]) {
              argv[0], omp_get_max_threads(), numints, numiters);
   }
 
-  // Allocate shared memory for original data and new prefix sums
-  //data.resize(numints);
+  // Allocate shared memory for new prefix sums
   prefix_sums.resize(numints);
 
   // Generate random ints
   {
     srand(omp_get_thread_num() * int(time(NULL)));
 
-    for(int i = 0; i < prefix_sums.size(); i++)//data.size(); i++)
+    for(int i = 0; i < prefix_sums.size(); i++)
     {
       int num = rand();
-      //data[i] = num;
       prefix_sums[i] = num;
     }
   }
 
-  // Write out initial data
   if(debugmode)
   {
     printf("Calculating prefix sum...\n");
@@ -233,7 +229,6 @@ int main(int argc, char *argv[]) {
   }
   double avgtime = (double) totaltime / times.size(); 
 
-  // Write out prefix sum data
   if(debugmode)
   {
     printf("done (avg. time: %f usec).\n", avgtime);
